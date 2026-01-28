@@ -24,7 +24,7 @@ export const ChatProvider = ({ children }) => {
     { id: 'gaming', name: 'Gaming', avatar: '👾', unread: 0 }
   ]);
 
-  // ALL FUNCTIONS DEFINED HERE (BEFORE useEffect and value object)
+  // ALL FUNCTIONS DEFINED HERE
   
   const login = useCallback((name, avatar) => {
     const newUser = {
@@ -47,16 +47,26 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   const joinRoom = useCallback((roomId) => {
+    console.log('🏠 joinRoom CALLED with:', roomId);
+    console.log('🏠 Current room before:', currentRoom);
+    
     if (currentRoom) {
+      console.log('🚪 Leaving current room:', currentRoom);
       socketService.leaveRoom(currentRoom);
     }
+    
+    console.log('🚪 Setting current room to:', roomId);
     setCurrentRoom(roomId);
+    
+    console.log('🚪 Joining room via socket:', roomId);
     socketService.joinRoom(roomId);
     
     // Clear unread count
     setRooms(prev => prev.map(room => 
       room.id === roomId ? { ...room, unread: 0 } : room
     ));
+    
+    console.log('✅ joinRoom COMPLETED');
   }, [currentRoom]);
 
   const sendMessage = useCallback((roomId, content) => {
@@ -64,20 +74,62 @@ export const ChatProvider = ({ children }) => {
     
     console.log('🔵 Sending message:', { roomId, content });
     
-    // Send to socket with all user data
+    // Create message object
+    const newMessage = {
+      id: Date.now() + Math.random(), // Unique ID
+      roomId,
+      content,
+      userId: user.id,
+      userName: user.name,
+      userAvatar: user.avatar,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('✨ Adding message to state immediately:', newMessage);
+    
+    // ✅ ADD TO STATE IMMEDIATELY (Optimistic Update)
+    // This makes YOUR message appear instantly on YOUR screen
+    setMessages(prev => {
+      const updated = {
+        ...prev,
+        [roomId]: [...(prev[roomId] || []), newMessage]
+      };
+      console.log('💾 Messages updated immediately:', updated);
+      return updated;
+    });
+    
+    // Then send to backend (for other users to see)
     socketService.sendMessage(roomId, content, user.id, user.name, user.avatar);
   }, [user]);
-      const deleteMessage = useCallback((roomId, messageId) => {
-      console.log('🗑️ Deleting message:', { roomId, messageId });
+
+  const deleteMessage = useCallback((roomId, messageId) => {
+    console.log('🗑️ Deleting message:', { roomId, messageId });
+    
+    // Delete locally immediately
+    setMessages(prev => ({
+      ...prev,
+      [roomId]: (prev[roomId] || []).filter(msg => msg.id !== messageId)
+    }));
+    
+    // Then tell backend
     socketService.deleteMessage(roomId, messageId);
   }, []);
 
   const clearChat = useCallback((roomId) => {
     if (window.confirm('Are you sure you want to clear all messages in this room?')) {
       console.log('🧹 Clearing chat:', roomId);
+      
+      // Clear locally immediately
+      setMessages(prev => ({
+        ...prev,
+        [roomId]: []
+      }));
+      
+      // Then tell backend
       socketService.clearChat(roomId);
     }
   }, []);
+
   const setTyping = useCallback((roomId, isTyping) => {
     if (!user) return;
     socketService.typing(roomId, user.id, isTyping);
@@ -88,22 +140,50 @@ export const ChatProvider = ({ children }) => {
     if (user) {
       socketService.connect(user.id);
 
-      // Listen for new messages
+      // Listen for new messages FROM OTHER USERS
       socketService.on('new_message', (message) => {
-        console.log('📨 Received message:', message);
+        console.log('📨 Received message from backend:', message);
+        
+        // Only add if it's from someone else (to avoid duplicates)
+        if (message.userId !== user.id) {
+          setMessages(prev => {
+            const updated = {
+              ...prev,
+              [message.roomId]: [...(prev[message.roomId] || []), message]
+            };
+            console.log('💾 Messages state updated with other user message:', updated);
+            return updated;
+          });
+
+          // Update unread count if not in current room
+          if (message.roomId !== currentRoom) {
+            setRooms(prev => prev.map(room => 
+              room.id === message.roomId 
+                ? { ...room, unread: room.unread + 1 }
+                : room
+            ));
+          }
+        } else {
+          console.log('⏭️ Skipping own message (already added locally)');
+        }
+      });
+
+      // Listen for message deleted
+      socketService.on('message_deleted', ({ roomId, messageId }) => {
+        console.log('🗑️ Message deleted (from backend):', { roomId, messageId });
         setMessages(prev => ({
           ...prev,
-          [message.roomId]: [...(prev[message.roomId] || []), message]
+          [roomId]: (prev[roomId] || []).filter(msg => msg.id !== messageId)
         }));
+      });
 
-        // Update unread count
-        if (message.roomId !== currentRoom) {
-          setRooms(prev => prev.map(room => 
-            room.id === message.roomId 
-              ? { ...room, unread: room.unread + 1 }
-              : room
-          ));
-        }
+      // Listen for chat cleared
+      socketService.on('chat_cleared', ({ roomId }) => {
+        console.log('🧹 Chat cleared (from backend):', roomId);
+        setMessages(prev => ({
+          ...prev,
+          [roomId]: []
+        }));
       });
 
       // Listen for typing events
@@ -131,6 +211,7 @@ export const ChatProvider = ({ children }) => {
 
       // Listen for room history
       socketService.on('room_history', ({ roomId, messages: roomMessages }) => {
+        console.log('📚 Room history received:', roomId, roomMessages);
         setMessages(prev => ({
           ...prev,
           [roomId]: roomMessages
@@ -159,6 +240,8 @@ export const ChatProvider = ({ children }) => {
     typingUsers,
     rooms,
     sendMessage,
+    deleteMessage,
+    clearChat,
     joinRoom,
     setTyping,
     login,

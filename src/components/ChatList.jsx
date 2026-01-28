@@ -6,9 +6,20 @@ const ChatList = () => {
   const { currentRoom, joinRoom, rooms } = useChatContext();
   const [searchTerm, setSearchTerm] = useState('');
 
+  // DEBUG
+  console.log('🎯 ChatList - currentRoom:', currentRoom);
+  console.log('🎯 ChatList - joinRoom function:', typeof joinRoom);
+
   const filteredRooms = rooms.filter(room =>
     room.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleRoomClick = (roomId) => {
+    console.log('🖱️ ROOM CLICKED:', roomId);
+    console.log('🔧 Calling joinRoom with:', roomId);
+    joinRoom(roomId);
+    console.log('✅ joinRoom called');
+  };
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -35,7 +46,7 @@ const ChatList = () => {
           {filteredRooms.map(room => (
             <button
               key={room.id}
-              onClick={() => joinRoom(room.id)}
+              onClick={() => handleRoomClick(room.id)}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg mb-1 transition ${
                 currentRoom === room.id
                   ? 'bg-blue-500 text-white'

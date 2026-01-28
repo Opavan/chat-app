@@ -17,6 +17,12 @@ const Chat = () => {
   const roomData = rooms.find(r => r.id === currentRoom);
   const roomMessages = messages[currentRoom] || [];
 
+  // DEBUG: Log messages state
+  console.log('🐛 DEBUG - Current Room:', currentRoom);
+  console.log('🐛 DEBUG - All Messages:', messages);
+  console.log('🐛 DEBUG - Room Messages:', roomMessages);
+  console.log('🐛 DEBUG - Room Messages Length:', roomMessages.length);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [roomMessages]);
@@ -142,13 +148,19 @@ const Chat = () => {
               </div>
             </div>
           ) : (
-            roomMessages.map((msg, index) => (
-              <Message
-                key={msg.id || index}
-                message={msg}
-                isOwn={msg.userId === user.id}
-              />
-            ))
+            <>
+              {console.log('🎨 RENDERING MESSAGES:', roomMessages)}
+              {roomMessages.map((msg, index) => {
+                console.log('🎨 Rendering message:', index, msg);
+                return (
+                  <Message
+                    key={msg.id || index}
+                    message={msg}
+                    isOwn={msg.userId === user.id}
+                  />
+                );
+              })}
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>
