@@ -46,7 +46,7 @@ const Chat = () => {
     <div className="h-screen flex bg-gray-100">
 
       {/* LEFT SIDEBAR */}
-      <div className="hidden lg:flex w-64 bg-gray-50 shadow-sm flex-col">
+      <div className="flex w-64 bg-gray-50 shadow-sm flex-col">
 
         {/* USER HEADER */}
         <div className="p-4 bg-white shadow-sm">
@@ -55,6 +55,7 @@ const Chat = () => {
               onClick={() => setShowSettings(true)}
               className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold shadow-md hover:ring-2 hover:ring-blue-500 transition"
               style={{ backgroundColor: getUserAvatarColor() }}
+              title="Profile & Settings"
             >
               {getUserAvatar()}
             </button>
@@ -65,14 +66,6 @@ const Chat = () => {
               </h3>
               <p className="text-xs text-green-500">Online</p>
             </div>
-
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
-              title="Settings"
-            >
-              <Settings size={20} className="text-gray-600" />
-            </button>
           </div>
         </div>
 
