@@ -7,18 +7,18 @@ const ChatList = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // DEBUG
-  console.log('🎯 ChatList - currentRoom:', currentRoom);
-  console.log('🎯 ChatList - joinRoom function:', typeof joinRoom);
+  console.log(' ChatList - currentRoom:', currentRoom);
+  console.log(' ChatList - joinRoom function:', typeof joinRoom);
 
   const filteredRooms = rooms.filter(room =>
     room.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleRoomClick = (roomId) => {
-    console.log('🖱️ ROOM CLICKED:', roomId);
-    console.log('🔧 Calling joinRoom with:', roomId);
+    console.log(' ROOM CLICKED:', roomId);
+    console.log(' Calling joinRoom with:', roomId);
     joinRoom(roomId);
-    console.log('✅ joinRoom called');
+    console.log(' joinRoom called');
   };
 
   return (

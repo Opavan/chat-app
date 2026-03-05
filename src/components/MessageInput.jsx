@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Paperclip, Smile } from 'lucide-react';
 import { useChatContext } from '../context/ChatContext';
+import axios from 'axios';
 
 const MessageInput = () => {
   const { currentRoom, sendMessage, setTyping } = useChatContext();
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false); // 👈 NEW
   const typingTimeoutRef = useRef(null);
   const emojiPickerRef = useRef(null);
 
@@ -16,22 +18,55 @@ const MessageInput = () => {
     '👋', '👏', '🙏', '💪', '✌️', '🤝', '👌', '🎊', '🎁', '🌟'
   ];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    console.log('🔵 Submit clicked'); // DEBUG
-    console.log('📝 Message:', message); // DEBUG
-    console.log('🏠 Current Room:', currentRoom); // DEBUG
-    
-    if (message.trim() && currentRoom) {
-      console.log('✅ Sending message...'); // DEBUG
+  // 👇 NEW — AI handler
+  const handleAiMessage = async (userQuestion) => {
+    try {
+      setIsAiLoading(true);
+
+      // Send user's @ai message to chat first
       sendMessage(currentRoom, message.trim());
       setMessage('');
-      setTyping(currentRoom, false);
-      setIsTyping(false);
-    } else {
-      console.log('❌ Cannot send - message or room missing'); // DEBUG
+
+      const response = await axios.post('http://localhost:3001/api/ai/chat', {
+        message: userQuestion,
+        chatHistory: [],
+      });
+
+      if (response.data.success) {
+        // Send AI reply as a message in the room
+        sendMessage(currentRoom, `🤖 AI: ${response.data.reply}`);
+      }
+    } catch (error) {
+  const errData = error.response?.data || error.message;
+  console.error('AI Error full:', errData);
+  alert('AI Error: ' + JSON.stringify(errData)); // 👈 ADD THIS
+  sendMessage(currentRoom, '🤖 AI: Sorry, I could not respond right now.');
+
+
+  } finally {
+      setIsAiLoading(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (!message.trim() || !currentRoom) return;
+
+    //  NEW — Check if message starts with @ai
+    if (message.trim().toLowerCase().startsWith('@ai ')) {
+      const userQuestion = message.trim().slice(4); // Remove "@ai " prefix
+      if (userQuestion) {
+        handleAiMessage(userQuestion);
+        return;
+      }
+    }
+
+    // Normal message flow
+    sendMessage(currentRoom, message.trim());
+    setMessage('');
+    setTyping(currentRoom, false);
+    setIsTyping(false);
   };
 
   const handleChange = (e) => {
@@ -57,14 +92,12 @@ const MessageInput = () => {
     setShowEmojiPicker(false);
   };
 
-  // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
         setShowEmojiPicker(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -79,6 +112,20 @@ const MessageInput = () => {
 
   return (
     <div className="bg-white">
+      {/* 👇 NEW — AI hint text */}
+      {message.startsWith('@') && !message.startsWith('@ai ') && (
+        <div className="px-4 py-1 text-xs text-blue-500">
+          💡 Tip: Type <strong>@ai </strong> followed by your question to ask AI
+        </div>
+      )}
+
+      {/* 👇 NEW — AI loading indicator */}
+      {isAiLoading && (
+        <div className="px-4 py-1 text-xs text-purple-500 flex items-center gap-1">
+          <span className="animate-pulse">🤖 AI is thinking...</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex items-center gap-2 relative">
         <button
           type="button"
@@ -86,7 +133,7 @@ const MessageInput = () => {
         >
           <Paperclip className="w-5 h-5 text-gray-500" />
         </button>
-        
+
         <div className="relative" ref={emojiPickerRef}>
           <button
             type="button"
@@ -96,7 +143,6 @@ const MessageInput = () => {
             <Smile className="w-5 h-5 text-gray-500" />
           </button>
 
-          {/* Emoji Picker Popup */}
           {showEmojiPicker && (
             <div className="absolute bottom-full left-0 mb-2 bg-white border rounded-lg shadow-lg p-3 w-64 z-50">
               <div className="text-xs font-semibold text-gray-600 mb-2">Pick an emoji</div>
@@ -120,17 +166,29 @@ const MessageInput = () => {
           type="text"
           value={message}
           onChange={handleChange}
-          placeholder={currentRoom ? "Type a message..." : "Select a room first..."}
-          className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          disabled={!currentRoom}
+          placeholder={currentRoom ? "Type a message or @ai <question>..." : "Select a room first..."}
+          className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
+            message.startsWith('@ai ')
+              ? 'focus:ring-purple-500 border-purple-300'  //  purple when @ai mode
+              : 'focus:ring-blue-500'
+          }`}
+          disabled={!currentRoom || isAiLoading}
         />
 
         <button
           type="submit"
-          disabled={!message.trim() || !currentRoom}
-          className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white p-2 rounded-lg transition"
+          disabled={!message.trim() || !currentRoom || isAiLoading}
+          className={`text-white p-2 rounded-lg transition disabled:cursor-not-allowed ${
+            message.startsWith('@ai ')
+              ? 'bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300' // 👈 purple send button
+              : 'bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300'
+          }`}
         >
-          <Send className="w-5 h-5" />
+          {isAiLoading ? (
+            <span className="w-5 h-5 block animate-spin">⏳</span>
+          ) : (
+            <Send className="w-5 h-5" />
+          )}
         </button>
       </form>
     </div>
