@@ -8,26 +8,40 @@ import OnlineUsers from '../components/OnlineUsers';
 import ProfileSettings from '../components/ProfileSettings';
 
 const Chat = () => {
-  const { user, currentRoom, rooms, messages, logout, clearChat } = useChatContext();
+  const { user, currentRoom, rooms, messages, logout, clearChat, markRead } = useChatContext();
   const messagesEndRef = useRef(null);
-
   const [showUsers, setShowUsers] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const roomData = rooms.find(r => r.id === currentRoom);
   const roomMessages = messages[currentRoom] || [];
 
-  // DEBUG: Log messages state
-  console.log('🐛 DEBUG - Current Room:', currentRoom);
-  console.log('🐛 DEBUG - All Messages:', messages);
-  console.log('🐛 DEBUG - Room Messages:', roomMessages);
-  console.log('🐛 DEBUG - Room Messages Length:', roomMessages.length);
-
+  // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [roomMessages]);
 
-  // Helper function for user avatar
+  // Mark messages as read
+  useEffect(() => {
+    const currentMessages = messages[currentRoom] || [];
+    if (!currentRoom || currentMessages.length === 0) return;
+
+    console.log(' Checking messages to mark read:', currentMessages.length);
+    console.log(' Current user id:', user?.id);
+
+    currentMessages.forEach(msg => {
+      console.log(' msg.userId:', msg.userId, 'user.id:', user?.id, 'isOwn:', msg.userId === user?.id);
+      if (msg.userId !== user?.id) {
+        console.log(' readBy:', msg.readBy, 'alreadyRead:', (msg.readBy || []).includes(user?.id));
+        const alreadyRead = (msg.readBy || []).includes(user?.id);
+        if (!alreadyRead) {
+          console.log('Marking as read:', msg.id);
+          markRead(currentRoom, msg.id);
+        }
+      }
+    });
+  }, [currentRoom, messages]);
+
   const getUserAvatar = () => {
     if (typeof user?.avatar === 'object' && user?.avatar?.emoji) {
       return <span className="text-3xl">{user.avatar.emoji}</span>;
@@ -47,8 +61,6 @@ const Chat = () => {
 
       {/* LEFT SIDEBAR */}
       <div className="flex w-64 bg-gray-50 shadow-sm flex-col">
-
-        {/* USER HEADER */}
         <div className="p-4 bg-white shadow-sm">
           <div className="flex items-center gap-3">
             <button
@@ -59,17 +71,12 @@ const Chat = () => {
             >
               {getUserAvatar()}
             </button>
-
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-800 truncate">
-                {user?.name}
-              </h3>
+              <h3 className="font-semibold text-gray-800 truncate">{user?.name}</h3>
               <p className="text-xs text-green-500">Online</p>
             </div>
           </div>
         </div>
-
-        {/* CHAT LIST */}
         <ChatList />
       </div>
 
@@ -93,7 +100,6 @@ const Chat = () => {
           </div>
 
           <div className="flex gap-2">
-            {/* Clear Chat Button */}
             {currentRoom && (
               <button
                 onClick={() => clearChat(currentRoom)}
@@ -103,7 +109,6 @@ const Chat = () => {
                 <Trash2 size={20} className="text-red-500" />
               </button>
             )}
-
             <button
               onClick={() => setShowUsers(!showUsers)}
               className="p-2 hover:bg-gray-100 rounded-lg"
@@ -111,7 +116,6 @@ const Chat = () => {
             >
               <Users size={20} />
             </button>
-
             <button
               onClick={() => setShowSettings(true)}
               className="p-2 hover:bg-gray-100 rounded-lg"
@@ -119,7 +123,6 @@ const Chat = () => {
             >
               <Settings size={20} />
             </button>
-
             <button
               onClick={logout}
               className="p-2 hover:bg-gray-100 rounded-lg"
@@ -141,19 +144,14 @@ const Chat = () => {
               </div>
             </div>
           ) : (
-            <>
-              {console.log('🎨 RENDERING MESSAGES:', roomMessages)}
-              {roomMessages.map((msg, index) => {
-                console.log('🎨 Rendering message:', index, msg);
-                return (
-                  <Message
-                    key={msg.id || index}
-                    message={msg}
-                    isOwn={msg.userId === user.id}
-                  />
-                );
-              })}
-            </>
+            roomMessages.map((msg, index) => (
+              <Message
+                key={msg.id || index}
+                message={msg}
+                isOwn={msg.userId === user.id}
+                isLast={index === roomMessages.length - 1}
+              />
+            ))
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -169,7 +167,6 @@ const Chat = () => {
         <OnlineUsers />
       </div>
 
-      {/* Profile & Settings Modal */}
       {showSettings && (
         <ProfileSettings onClose={() => setShowSettings(false)} />
       )}

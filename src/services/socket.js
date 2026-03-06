@@ -8,6 +8,9 @@ class SocketService {
   }
 
   connect(userId) {
+    // Don't reconnect if already connected
+    if (this.socket?.connected) return this.socket;
+
     try {
       this.socket = io(SOCKET_URL, {
         auth: { userId },
@@ -18,19 +21,19 @@ class SocketService {
       });
 
       this.socket.on('connect', () => {
-        console.log('✅ Connected to backend server');
+        console.log(' Connected to backend server');
       });
 
       this.socket.on('connect_error', (error) => {
-        console.warn('⚠️ Backend not available - running in local mode');
+        console.warn(' Backend not available');
       });
 
       this.socket.on('disconnect', () => {
-        console.log('❌ Disconnected from backend server');
+        console.log(' Disconnected from backend server');
       });
 
     } catch (error) {
-      console.warn('⚠️ Backend not available - messages will be local only');
+      console.warn(' Backend not available');
     }
 
     return this.socket;
@@ -45,10 +48,10 @@ class SocketService {
 
   emit(event, data) {
     if (this.socket?.connected) {
-      console.log('📤 Emitting event:', event, data);
+      console.log(' Emitting event:', event, data);
       this.socket.emit(event, data);
     } else {
-      console.error('❌ Socket not connected, cannot emit:', event);
+      console.error(' Socket not connected, cannot emit:', event);
     }
   }
 
@@ -64,40 +67,60 @@ class SocketService {
     }
   }
 
+  removeAllListeners() {
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      // Re-add core listeners after clearing
+      this.socket.on('connect', () => {
+        console.log(' Connected to backend server');
+      });
+      this.socket.on('disconnect', () => {
+        console.log(' Disconnected from backend server');
+      });
+    }
+  }
+
   joinRoom(roomId) {
-    console.log('🚪 Joining room:', roomId);
+    console.log(' Joining room:', roomId);
     this.emit('join_room', { roomId });
   }
 
   leaveRoom(roomId) {
-    console.log('🚪 Leaving room:', roomId);
+    console.log(' Leaving room:', roomId);
     this.emit('leave_room', { roomId });
   }
 
-  sendMessage(roomId, content, userId, userName, userAvatar) {
-    console.log('💬 Sending message via socket:', { roomId, content, userId, userName });
+  sendMessage(roomId, content, userId, userName, userAvatar,type = 'text') {
+    console.log(' Sending message via socket:', { roomId, content, userId, userName });
     this.emit('send_message', {
       roomId,
       content,
       userId,
       userName,
       userAvatar,
+      type,
       timestamp: new Date().toISOString()
     });
   }
 
   deleteMessage(roomId, messageId) {
-    console.log('🗑️ Deleting message:', { roomId, messageId });
+    console.log(' Deleting message:', { roomId, messageId });
     this.emit('delete_message', { roomId, messageId });
   }
 
   clearChat(roomId) {
-    console.log('🧹 Clearing chat:', roomId);
+    console.log(' Clearing chat:', roomId);
     this.emit('clear_chat', { roomId });
   }
-
+    markRead(roomId, messageId, userId) {
+    this.emit('mark_read', { roomId, messageId, userId });
+  }
   typing(roomId, userId, isTyping) {
     this.emit('typing', { roomId, userId, isTyping });
+  }
+
+  markRead(roomId, messageId, userId) {
+    this.emit('mark_read', { roomId, messageId, userId });
   }
 }
 

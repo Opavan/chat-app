@@ -12,7 +12,6 @@ app.use(express.json());
 
 const server = http.createServer(app);
 
-//  Groq setup
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 app.post('/api/ai/chat', async (req, res) => {
@@ -20,7 +19,6 @@ app.post('/api/ai/chat', async (req, res) => {
     const { message, chatHistory } = req.body;
     console.log(' AI Request received:', message);
 
-    // Convert chat history to Groq format
     const history = (chatHistory || []).map((msg) => ({
       role: msg.isAI ? 'assistant' : 'user',
       content: msg.content,
@@ -35,10 +33,7 @@ app.post('/api/ai/chat', async (req, res) => {
           Keep responses concise and conversational. Max 3-4 sentences.`,
         },
         ...history,
-        {
-          role: 'user',
-          content: message,
-        },
+        { role: 'user', content: message },
       ],
       max_tokens: 300,
     });
@@ -70,27 +65,22 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', ({ roomId }) => {
     socket.join(roomId);
-
     if (!roomUsers.has(roomId)) {
       roomUsers.set(roomId, new Set());
     }
     roomUsers.get(roomId).add(socket.id);
-
     socket.emit('room_history', {
       roomId,
       messages: messages[roomId] || [],
     });
-
     console.log(`User ${socket.id} joined room ${roomId}`);
   });
 
   socket.on('leave_room', ({ roomId }) => {
     socket.leave(roomId);
-
     if (roomUsers.has(roomId)) {
       roomUsers.get(roomId).delete(socket.id);
     }
-
     console.log(`User ${socket.id} left room ${roomId}`);
   });
 
@@ -100,14 +90,11 @@ io.on('connection', (socket) => {
       id: Date.now() + Math.random(),
       timestamp: new Date().toISOString(),
     };
-
     if (!messages[data.roomId]) {
       messages[data.roomId] = [];
     }
     messages[data.roomId].push(message);
-
     io.to(data.roomId).emit('new_message', message);
-
     console.log(`Message sent to room ${data.roomId}:`, message.content);
   });
 
@@ -119,12 +106,10 @@ io.on('connection', (socket) => {
       isAI: true,
       sender: 'AI Assistant',
     };
-
     if (!messages[data.roomId]) {
       messages[data.roomId] = [];
     }
     messages[data.roomId].push(aiMessage);
-
     io.to(data.roomId).emit('new_message', aiMessage);
   });
 
@@ -142,6 +127,21 @@ io.on('connection', (socket) => {
     console.log(`Chat cleared in room ${roomId}`);
   });
 
+  socket.on('mark_read', ({ roomId, messageId, userId }) => {
+    if (messages[roomId]) {
+      messages[roomId] = messages[roomId].map(msg => {
+        if (msg.id === messageId) {
+          const readBy = msg.readBy || [];
+          if (!readBy.includes(userId)) {
+            return { ...msg, readBy: [...readBy, userId] };
+          }
+        }
+        return msg;
+      });
+      io.to(roomId).emit('message_read', { roomId, messageId, userId });
+    }
+  });
+
   socket.on('typing', ({ roomId, userId, isTyping }) => {
     socket.to(roomId).emit('user_typing', {
       userId,
@@ -154,7 +154,6 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     users.delete(socket.id);
-
     roomUsers.forEach((usersSet) => {
       if (usersSet.has(socket.id)) {
         usersSet.delete(socket.id);
