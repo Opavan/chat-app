@@ -36,12 +36,15 @@ const MessageInput = () => {
         // Send AI reply as a message in the room
         sendMessage(currentRoom, `🤖 AI: ${response.data.reply}`);
       }
-    } catch (error) {
-  const errData = error.response?.data || error.message;
-  console.error('AI Error full:', errData);
-  alert('AI Error: ' + JSON.stringify(errData)); // 👈 ADD THIS
-  sendMessage(currentRoom, '🤖 AI: Sorry, I could not respond right now.');
+   } catch (error) {
+  const errData = error.response?.data?.error || error.message;
+  console.error('AI Error:', errData);
 
+  if (error.response?.status === 429) {
+    sendMessage(currentRoom, '🤖 AI: Quota exceeded. Will be back tomorrow!');
+  } else {
+    sendMessage(currentRoom, '🤖 AI: Sorry, I could not respond right now.');
+  }
 
   } finally {
       setIsAiLoading(false);

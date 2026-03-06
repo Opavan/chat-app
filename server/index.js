@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 require('dotenv').config();
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
 const app = express();
 app.use(cors());
@@ -12,45 +12,43 @@ app.use(express.json());
 
 const server = http.createServer(app);
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 👇 Groq setup
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { message, chatHistory } = req.body;
-    console.log(' AI Request received:', message); //  NEW
+    console.log('🤖 AI Request received:', message);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-    const systemPrompt = `You are a helpful AI assistant inside a chat application. 
-    Keep responses concise and conversational. Max 3-4 sentences.`;
-
+    // Convert chat history to Groq format
     const history = (chatHistory || []).map((msg) => ({
-      role: msg.isAI ? 'model' : 'user',
-      parts: [{ text: msg.content }],
+      role: msg.isAI ? 'assistant' : 'user',
+      content: msg.content,
     }));
 
-    const chat = model.startChat({
-      history,
-      generationConfig: { maxOutputTokens: 300 },
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a helpful AI assistant inside a chat application. 
+          Keep responses concise and conversational. Max 3-4 sentences.`,
+        },
+        ...history,
+        {
+          role: 'user',
+          content: message,
+        },
+      ],
+      max_tokens: 300,
     });
 
-    const result = await chat.sendMessage(`${systemPrompt}\n\nUser: ${message}`);
-    const reply = result.response.text();
-
-    console.log(' AI replied successfully'); //
+    const reply = response.choices[0]?.message?.content || 'I could not respond.';
+    console.log('✅ AI replied successfully');
     res.json({ success: true, reply });
 
   } catch (error) {
     console.error('AI Error:', error.message);
-
-    //  NEW — Handle rate limit specifically
-    if (error.message?.includes('429') || error.message?.includes('quota')) {
-      return res.status(429).json({
-        success: false,
-        error: 'Rate limit reached. Please wait a moment and try again.',
-      });
-    }
-
     res.status(500).json({ success: false, error: 'AI failed to respond' });
   }
 });
