@@ -12,13 +12,13 @@ app.use(express.json());
 
 const server = http.createServer(app);
 
-// 👇 Groq setup
+//  Groq setup
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { message, chatHistory } = req.body;
-    console.log('🤖 AI Request received:', message);
+    console.log(' AI Request received:', message);
 
     // Convert chat history to Groq format
     const history = (chatHistory || []).map((msg) => ({
@@ -44,7 +44,7 @@ app.post('/api/ai/chat', async (req, res) => {
     });
 
     const reply = response.choices[0]?.message?.content || 'I could not respond.';
-    console.log('✅ AI replied successfully');
+    console.log(' AI replied successfully');
     res.json({ success: true, reply });
 
   } catch (error) {
